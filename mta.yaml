@@ -1,0 +1,38 @@
+ID: cap-products
+version: 1.0.0
+modules:
+  - name: cap-products-service
+    type: nodejs
+    path: gen/srv
+    parameters:
+      memory: 256M
+    requires:
+      - name: products-db
+      - name: products-uaa
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+
+  - name: saprecap-your-app
+    type: nodejs
+    path: app
+    parameters:
+      memory: 256M
+    requires:
+      - name: srv-api
+      - name: products-uaa
+
+resources:
+  - name: products-db
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: postgresql-db
+      service-plan: trial
+
+  - name: products-uaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json

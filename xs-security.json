@@ -1,0 +1,30 @@
+{
+    "xsappname": "cap-products-service",
+    "tenant-mode": "dedicated",
+    "scopes": [
+      {
+        "name": "$XSAPPNAME.user",
+        "description": "User role"
+      },
+      {
+        "name": "$XSAPPNAME.admin",
+        "description": "Admin role"
+      }
+    ],
+    "role-templates": [
+      {
+        "name": "user",
+        "description": "User role template",
+        "scope-references": [
+          "$XSAPPNAME.user"
+        ]
+      },
+      {
+        "name": "admin",
+        "description": "Admin role template",
+        "scope-references": [
+          "$XSAPPNAME.admin"
+        ]
+      }
+    ]
+  }
