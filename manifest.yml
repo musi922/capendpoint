@@ -2,6 +2,7 @@ applications:
 - name: cap-products-service
   path: gen/srv
   memory: 256M
+  command: node server.js
   buildpacks:
     - nodejs_buildpack
   services:

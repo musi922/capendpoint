@@ -6,6 +6,10 @@ module.exports = cds.service.impl(async function () {
     const { Products, Cart, Users } = this.entities;
 
     try {
+        // Check if database is ready
+        await cds.connect.to('db');
+        
+        const { Users } = this.entities;
         const adminExists = await SELECT.from(Users).where({ username: 'admin' });
         
         if (adminExists.length === 0) {
@@ -20,7 +24,9 @@ module.exports = cds.service.impl(async function () {
         }
     } catch (error) {
         console.error('Error initializing admin:', error);
+        // Don't throw the error, just log it and continue
     }
+    
 
     this.on('login', async req => {
         const { username, password } = req.data;
