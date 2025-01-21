@@ -27,6 +27,7 @@ entity Products {
 entity Cart {
     key CartId: UUID;
     product_ProductId: Association to Products;
+    user: Association to Users;
     quantity: Integer;
     dateAdded: Timestamp;
 }

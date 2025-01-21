@@ -27,13 +27,12 @@ module.exports = cds.service.impl(async function () {
         
         try {
             const user = await SELECT.from(Users).where({ username });
-            console.log("Found user:", user[0]); // Add this log
+            console.log("Found user:", user[0]); 
             
             if (!user.length || !(await bcrypt.compare(password, user[0].password))) {
                 return req.error(401, 'Invalid credentials');
             }
     
-            // Ensure role is set
             const userRole = user[0].role || 'user';
             
             const token = jwt.sign(
@@ -59,7 +58,6 @@ module.exports = cds.service.impl(async function () {
             const token = authHeader.replace('Bearer ', '');
             req.user = jwt.verify(token, SECRET_KEY);
             
-            // Add check for token expiration
             if (req.user.exp * 1000 < Date.now()) {
                 return req.error(401, 'Token expired');
             }
@@ -76,23 +74,31 @@ module.exports = cds.service.impl(async function () {
         if (req.user.role !== 'user') return req.error(403, 'User access required');
     });
 
-    this.on('manageProducts', async req => {
-        if (req.user.role !== 'admin') return req.error(403, 'Admin access required');
+    this.before('DELETE', 'Cart', async (req) => {
+        const tx = cds.transaction(req);
+        const { CartId } = req.data;
 
-        const { action, productId, updates } = req.data;
         try {
-            switch (action) {
-                case 'create':
-                    return await INSERT.into(Products).entries(updates);
-                case 'update':
-                    return await UPDATE(Products).with(updates).where({ ProductId: productId });
-                case 'delete':
-                    return await DELETE.from(Products).where({ ProductId: productId });
-                default:
-                    return req.error(400, 'Invalid action');
+            const cartItem = await tx.read(Cart).where({ 
+                CartId,
+                user_ID: req.user.id 
+            });
+
+            if (!cartItem.length) {
+                return req.error(404, "Cart item not found or doesn't belong to the current user");
             }
+
+            const productId = cartItem[0].product_ProductId.ProductId;
+            console.log("Product ID to update:", productId);
+
+            await tx.update(Products)
+                .set({ isInCart: false })
+                .where({ ProductId: productId });
+
+            console.log("Updated product isInCart flag for product:", productId);
         } catch (error) {
-            return req.error(500, 'Product operation failed');
+            console.error("Delete error:", error);
+            return req.error(500, "Failed to process delete request");
         }
     });
 
@@ -100,40 +106,45 @@ module.exports = cds.service.impl(async function () {
         const { ProductId } = req.data;
         const tx = cds.transaction(req);
 
-        const product = await tx.read(Products).where({ ProductId , isInCart: false});
+        const product = await tx.read(Products).where({ ProductId, isInCart: false });
         if (!product.length) {
-            return req.error('Product not found');
+            return req.error('Product not found or already in cart');
         }
 
         await tx.update(Products)
-        .set({ isInCart: true })
-        .where({ ProductId: ProductId });
+            .set({ isInCart: true })
+            .where({ ProductId: ProductId });
 
         const cartItem = {
             CartId: cds.utils.uuid(),
-            product_ProductId: {ProductId},
+            product_ProductId: { ProductId },
+            user_ID: req.user.id,
             quantity: 1,
             dateAdded: new Date(),
         };
         console.log("Cart Item Added:", cartItem);
 
-    await tx.create(Cart).entries(cartItem);
-    return { success: true };
-
-
+        await tx.create(Cart).entries(cartItem);
+        return { success: true };
     });
-    
-    
 
     this.on('getCartItems', async req => {
         if (req.user.role !== 'user') {
             return req.error(403, 'User access required');
         }
 
-        return cds.transaction(req).read(Cart, c => {
-            c('*', c.product_ProductId('*'));
+        return cds.transaction(req).read(Cart).where({ user_ID: req.user.id }).columns(c => {
+            c('*');
+            c.product_ProductId('*');
         });
     });
+
+    this.on('Users', async req => {
+        if (req.user.role !== 'admin') {
+            return req.error(403, 'Admin access required');
+        }
+        return SELECT.from(Users);
+    })
 
     this.on('createUser', async req => {
         if (req.user.role !== 'admin') return req.error(403, 'Admin access required');
@@ -156,4 +167,30 @@ module.exports = cds.service.impl(async function () {
             return req.error(500, 'Failed to create user');
         }
     });
+
+    this.on('DELETE', 'Users', async (req) => {
+        if (req.user.role !== 'admin') {
+            return req.error(403, 'Admin access required');
+        }
+
+        const username = req.data.ID;
+        
+        try {
+            if (username === 'admin') {
+                return req.error(403, 'Cannot delete admin user');
+            }
+
+            const result = await DELETE.from(Users).where({ username: username });
+            
+            if (result === 0) {
+                return req.error(404, 'User not found');
+            }
+
+            return { message: 'User deleted successfully' };
+        } catch (error) {
+            console.error("Error deleting user:", error);
+            return req.error(500, 'Failed to delete user');
+        }
+    });
+
 });
