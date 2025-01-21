@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const { log } = require('@sap/cds');
 const SECRET_KEY = process.env.SECRET_KEY || 'default-secret-key-for-development';
 
 module.exports = cds.service.impl(async function () {
@@ -87,9 +88,12 @@ module.exports = cds.service.impl(async function () {
             if (!cartItem.length) {
                 return req.error(404, "Cart item not found or doesn't belong to the current user");
             }
+            console.log("Cart Item to delete:", cartItem[0]);
+            
 
-            const productId = cartItem[0].product_ProductId.ProductId;
+            const productId = cartItem[0].product_ProductId_ProductId;
             console.log("Product ID to update:", productId);
+            console.log('here',Products)
 
             await tx.update(Products)
                 .set({ isInCart: false })
